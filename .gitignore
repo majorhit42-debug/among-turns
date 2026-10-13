@@ -1,0 +1,15 @@
+# Godot 4+ editor cache
+.godot/
+
+# Build outputs (we DO want builds/web/ committed — that's what Vercel serves)
+builds/desktop/
+builds/mobile/
+
+# OS files
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+# Editors
+.vscode/
+.idea/
