@@ -6,6 +6,9 @@
 
 A **turn-based Among Us for one shared screen**. 8 crewmates (1 impostor) on a small ship of 8 rooms. Real players pass the screen between turns; bots fill the empty seats. 1–8 humans.
 
+**Live URL:** https://among-turns.vercel.app/
+**Repository:** https://github.com/majorhit42-debug/among-turns
+
 A father-son project — Todd and Axel. We build by chatting with Claude Code directly in this window (no separate prompt files).
 
 ## Tech Stack
@@ -13,7 +16,7 @@ A father-son project — Todd and Axel. We build by chatting with Claude Code di
 - **Engine:** Godot 4.6, GDScript (no C# — it can't export to web)
 - **Renderer:** Compatibility (WebGL 2) — required for web export. Don't switch to Forward+/Mobile.
 - **Look:** 3D, fixed top-down camera, everything built from simple shapes in code (no imported models yet)
-- **Hosting:** Vercel serves `builds/web/` (same setup as Axkour; not deployed yet)
+- **Hosting:** Vercel serves `builds/web/`. Connected to GitHub: every push to `main` redeploys.
 
 ## How the game works
 
@@ -60,7 +63,7 @@ among-turns/
   `godot --script res://tests/screenshots.gd -- <folder>`
 - **Never leak secrets on the shared screen.** Between turns (hand-over, meetings, bot turns) the board shows nobody. Only the active human's own room is shown during their turn.
 - Every HUD container that covers the board uses `mouse_filter = IGNORE`, so room clicks reach the 3D board.
-- **Web export:** `godot --headless --export-release among-turns builds/web/index.html`, then commit `builds/web/`.
+- **To update the live site:** re-export with `godot --headless --export-release among-turns builds/web/index.html`, commit `builds/web/`, and push. Vercel only serves the files; it doesn't build the game.
 
 ## Roadmap / ideas
 
@@ -71,4 +74,3 @@ among-turns/
 - Player-chosen colors and names, hats
 - 2 impostors for 10-player games
 - Sound
-- Deploy to Vercel + GitHub repo
