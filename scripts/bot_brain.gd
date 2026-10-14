@@ -182,7 +182,7 @@ static func _crew_statement(s: GameState, p: GameState.Player) -> Dictionary:
 	if suspect >= 0 and p.suspicion[suspect] >= VOTE_THRESHOLD:
 		var seen: Dictionary = p.last_seen.get(suspect, {"room": "somewhere", "round": 0})
 		return _say(p, "%s was in %s in round %d, near the body. Sus!" % [s.players[suspect].name, seen["room"], seen["round"]], suspect, 2.0)
-	return _say(p, "I was doing tasks in %s. I didn't see anything weird." % p.room, -1, 0.0)
+	return _say(p, "I was doing chores at %s. I didn't see anything weird." % p.room, -1, 0.0)
 
 
 ## The impostor sometimes blames someone, otherwise acts innocent.
@@ -196,7 +196,7 @@ static func _impostor_statement(s: GameState, p: GameState.Player) -> Dictionary
 		var room: String = s.pending_meeting["room"]
 		return _say(p, "I saw %s hanging around %s. Sus!" % [target.name, room], target.id, 2.0)
 	var rooms := MapData.room_names()
-	return _say(p, "I was doing tasks in %s. I didn't see anything weird." % rooms[s.rng.randi_range(0, rooms.size() - 1)], -1, 0.0)
+	return _say(p, "I was doing chores at %s. I didn't see anything weird." % rooms[s.rng.randi_range(0, rooms.size() - 1)], -1, 0.0)
 
 
 static func vote(s: GameState, p: GameState.Player) -> int:

@@ -1,10 +1,10 @@
-# Among Turns — CLAUDE.md
+# Axe Us — CLAUDE.md
 
-> **Working title.** Axel gets to name it — change `config/name` in `project.godot`, the title in `scripts/main.gd` (`_show_setup`), and this file.
+> **Name:** "Axe Us" (Axel's pick, 2026-10-13). The folder, GitHub repo and Vercel project are still called `among-turns`.
 
 ## Project Overview
 
-A **turn-based Among Us for one shared screen**. 8 crewmates (1 impostor, 1 Sheriff) on a small ship of 8 rooms. Real players pass the screen between turns; bots fill the empty seats. 1–8 humans.
+A **turn-based hidden-impostor game for one shared screen, set in a lumber camp**. 8 lumberjacks (1 impostor, 1 Sheriff) in a forest camp of 8 places. Everyone carries an axe. Real players pass the screen between turns; bots fill the empty seats. 1–8 humans.
 
 **Live URL:** https://among-turns.vercel.app/
 **Repository:** https://github.com/majorhit42-debug/among-turns
@@ -15,8 +15,21 @@ A father-son project — Todd and Axel. We build by chatting with Claude Code di
 
 - **Engine:** Godot 4.6, GDScript (no C# — it can't export to web)
 - **Renderer:** Compatibility (WebGL 2) — required for web export. Don't switch to Forward+/Mobile.
-- **Look:** 3D, fixed top-down camera, everything built from simple shapes in code (no imported models yet)
+- **Look:** 3D, fixed top-down camera over a pine forest, everything built from simple shapes in code (no imported models). Lumberjacks = shirt in their color + head + beard + beanie + axe.
 - **Hosting:** Vercel serves `builds/web/`. Connected to GitHub: every push to `main` redeploys.
+
+## Theme words
+
+The code still uses Among Us words internally; the screen shows lumber-camp words. Keep new on-screen text in the camp theme.
+
+| Code | On screen |
+|---|---|
+| crew / crewmate | lumberjack |
+| task | chore |
+| vent | hollow log |
+| emergency meeting | ringing the camp bell (Mess Hall) |
+| ejected | voted out of camp |
+| rooms | Mess Hall, Tool Shed, Lookout Tower, Sawmill, Log Yard, Generator, Bunkhouse, Ranger Station |
 
 ## How the game works
 
@@ -26,15 +39,15 @@ A father-son project — Todd and Axel. We build by chatting with Claude Code di
   - **Kill** (impostor) — anyone in the room; kill cooldown 1 round; no kills in round 1
   - **Shoot** (Sheriff) — anyone in the room; same cooldown as kills; 2 bullets per game
   - **Report body** — starts a meeting
-  - **Emergency meeting** — in Cafeteria, once per player per game
+  - **Ring the camp bell** (emergency meeting) — in the Mess Hall, once per player per game
 - **Sheriff** (Axel's idea, added 2026-10-13): one random non-impostor every game, human or bot. A crewmate with a gun.
   - Wins **only by shooting the impostor**. Getting killed, the crew finishing tasks first, or the impostor being voted out = Sheriff loses.
   - **The secret:** a shot leaves a normal body; nobody (not even the Sheriff) learns if the impostor is dead until **3 players are dead** (kills, shots and ejections all count). At that point, if the Sheriff got the impostor → game over, crew + Sheriff win. A shot after that ends it immediately.
   - Witnesses of a shot see it was the Sheriff's gun (`SAW X SHOOT Y`) — bots don't treat that as an impostor kill.
   - A secretly shot impostor's ghost just haunts; the crew can still win by tasks (and the Sheriff still wins if they shot the impostor).
-- **Vents** (impostor only) count as a move: Medbay↔Electrical, Weapons↔Shields, Engine↔Navigation.
+- **Hollow logs** (impostor only) count as a move: Ranger Station↔Generator, Tool Shed↔Sawmill, Bunkhouse↔Lookout Tower.
 - **Hidden info:** you only see who's in *your* room. Each player keeps a private "What you've seen" log.
-- **Meetings:** all bodies are found and removed; bots make statements; humans argue out loud; everyone votes in secret (pass the screen); most votes is ejected, tie/skip = nobody. Then everyone returns to Cafeteria.
+- **Meetings:** all bodies are found and removed; bots make statements; humans argue out loud; everyone votes in secret (pass the screen); most votes is ejected, tie/skip = nobody. Then everyone returns to the Mess Hall.
 - **Win:** crew finish all tasks (ghosts keep doing tasks), vote out the impostor, or the Sheriff's shot gets revealed; impostor wins when crew alive ≤ impostors alive.
 
 ## Bots (`scripts/bot_brain.gd`)
@@ -50,10 +63,10 @@ among-turns/
 ├── project.godot / export_presets.cfg / vercel.json
 ├── scenes/main.tscn        # Just a Node3D running main.gd — everything else is built in code
 ├── scripts/
-│   ├── map_data.gd         # Rooms, positions, halls, vents, task names. Edit the map here.
+│   ├── map_data.gd         # Places, positions, paths, hollow logs, chore names. Edit the map here.
 │   ├── game_state.gd       # ALL the rules, no graphics. Player inner class.
 │   ├── bot_brain.gd        # Bot turns, meeting statements, votes
-│   ├── board.gd            # 3D ship, crewmates, bodies; shows only what the viewer can see
+│   ├── board.gd            # 3D camp, forest, lumberjacks, bodies; shows only what the viewer can see
 │   └── main.gd             # Screen flow + UI: setup → hand-over → turn → meeting → vote → game over
 └── tests/
     ├── sim.gd              # Plays 1000 all-bot games: checks none get stuck, prints balance
@@ -77,7 +90,6 @@ among-turns/
 ## Roadmap / ideas
 
 - **Humans speak in meetings:** "I saw X kill!" / "X is sus" buttons that bots listen to. Right now bots ignore what humans say out loud.
-- Axel names the game
 - Sabotage (lights out = you can't see who's in your room; reactor countdown)
 - Animations: walk between rooms, kill animation, ejection scene
 - Player-chosen colors and names, hats

@@ -233,7 +233,7 @@ func actions_for(p: Player) -> Array[Dictionary]:
 	var acts: Array[Dictionary] = []
 	if not moved_this_turn and has_task_here(p):
 		var task_name: String = MapData.ROOM_TASKS[p.room]
-		acts.append({"type": "task", "label": ("Fake task: " if p.impostor else "Task: ") + task_name})
+		acts.append({"type": "task", "label": ("Fake chore: " if p.impostor else "Chore: ") + task_name})
 	if not p.alive:
 		return acts  # Ghosts can only do tasks.
 	if not bodies_in(p.room).is_empty():
@@ -247,7 +247,7 @@ func actions_for(p: Player) -> Array[Dictionary]:
 			if other != p:
 				acts.append({"type": "shoot", "target": other.id, "label": "SHOOT " + other.name})
 	if p.room == MapData.EMERGENCY_ROOM and not p.used_emergency:
-		acts.append({"type": "emergency", "label": "Emergency meeting"})
+		acts.append({"type": "emergency", "label": "Ring the camp bell"})
 	return acts
 
 
@@ -269,7 +269,7 @@ func do_task(p: Player) -> void:
 	for task in p.tasks:
 		if task["room"] == p.room and not task["done"]:
 			task["done"] = true
-			add_note(p, "R%d %s: did a task" % [round_num, p.room])
+			add_note(p, "R%d %s: did a chore" % [round_num, p.room])
 			break
 	check_win()
 
@@ -393,13 +393,13 @@ func check_win() -> void:
 			win_reason = "The Sheriff shot the impostor!"
 		elif tasks_done:
 			winner = "crew"
-			win_reason = "All tasks are done!"
+			win_reason = "All the chores are done!"
 	elif crew_alive <= impostors_alive:
 		winner = "impostor"
 		win_reason = "The impostor got everyone!"
 	elif tasks_done:
 		winner = "crew"
-		win_reason = "All tasks are done!"
+		win_reason = "All the chores are done!"
 
 
 func _shuffled(items: Array) -> Array:

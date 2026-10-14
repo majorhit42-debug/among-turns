@@ -49,8 +49,8 @@ func _ready() -> void:
 func _show_setup() -> void:
 	_hud_visible(false)
 	board.show_view(state, null, [])
-	_overlay_open("AMONG TURNS", Color.WHITE)
-	_overlay_box.add_child(_label("A turn-based Among Us for one screen. (Working title — Axel gets to name it!)", 18, DIM_COLOR, true))
+	_overlay_open("AXE US", Color(1.0, 0.85, 0.55))
+	_overlay_box.add_child(_label("Somebody at the lumber camp is not who they seem...", 18, DIM_COLOR, true))
 	_overlay_box.add_child(_label("How many real players?", 24, Color.WHITE, true))
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -75,11 +75,11 @@ func _show_setup() -> void:
 	update.call()
 	_overlay_box.add_child(_label(
 		"HOW TO PLAY\n"
-		+ "• On your turn, move to a room next door (or stay), then do one thing.\n"
-		+ "• You only see who's in YOUR room. Remember what you saw!\n"
-		+ "• Crewmates: stay in a room for a turn to do a task there. Win by finishing all tasks or voting out the impostor.\n"
-		+ "• Impostor: catch someone alone and kill them. Use vents to sneak across the ship. Don't get caught!\n"
-		+ "• Sheriff: a crewmate with 2 bullets. Shoot the impostor to win, but nobody finds out who was shot until 3 players are dead!\n"
+		+ "• On your turn, walk to a place next door (or stay), then do one thing.\n"
+		+ "• You only see who's at YOUR place. Remember what you saw!\n"
+		+ "• Lumberjacks: stay in a place for a turn to do a chore there. Win by finishing all chores or voting out the impostor.\n"
+		+ "• Impostor: catch someone alone and take them out. Crawl through hollow logs to sneak across camp. Don't get caught!\n"
+		+ "• Sheriff: a lumberjack with 2 bullets. Shoot the impostor to win, but nobody finds out who was shot until 3 players are dead!\n"
 		+ "• Find a body? Report it. Then everyone talks it over and votes in secret.", 18, Color.WHITE))
 	_overlay_box.add_child(_button("Start game", _start_game))
 
@@ -130,23 +130,23 @@ func _begin_human_turn(p: GameState.Player) -> void:
 		_told_role[p.id] = true
 		if p.impostor:
 			_overlay_open("You are the IMPOSTOR", IMPOSTOR_COLOR)
-			_overlay_box.add_child(_label("Kill crewmates when they're alone. You can travel through vents. Pretend to do tasks, and lie in meetings! Watch out: one crewmate is a secret Sheriff with a gun.", 20, Color.WHITE, true))
+			_overlay_box.add_child(_label("Take out lumberjacks when they're alone. You can crawl through hollow logs. Pretend to do chores, and lie in meetings! Watch out: one lumberjack is a secret Sheriff with a gun.", 20, Color.WHITE, true))
 		elif p.sheriff:
 			_overlay_open("You are the SHERIFF", SHERIFF_COLOR)
-			_overlay_box.add_child(_label("You're on the crew, with %d bullets for the whole game. You only win if YOU shoot the impostor. Shoot the wrong person and an innocent crewmate dies.\nYou won't find out if you got the impostor until %d players are dead. If you get killed, you lose." % [GameState.SHERIFF_BULLETS, GameState.SECRET_UNTIL_DEAD], 20, Color.WHITE, true))
+			_overlay_box.add_child(_label("You're a lumberjack, with %d bullets for the whole game. You only win if YOU shoot the impostor. Shoot the wrong person and an innocent lumberjack dies.\nYou won't find out if you got the impostor until %d players are dead. If you get killed, you lose." % [GameState.SHERIFF_BULLETS, GameState.SECRET_UNTIL_DEAD], 20, Color.WHITE, true))
 		else:
-			_overlay_open("You are a CREWMATE", CREW_COLOR)
-			_overlay_box.add_child(_label("Do your tasks (the yellow ! rooms) and watch who you see where. One of the others is the impostor...", 20, Color.WHITE, true))
+			_overlay_open("You are a LUMBERJACK", CREW_COLOR)
+			_overlay_box.add_child(_label("Do your chores (the yellow ! places) and watch who you see where. One of the others is the impostor...", 20, Color.WHITE, true))
 		_overlay_box.add_child(_button("Got it", _begin_human_turn.bind(p)))
 		return
 	if not p.alive and not _told_dead.has(p.id):
 		_told_dead[p.id] = true
-		var how := "You were voted off the ship."
+		var how := "You were voted out of camp."
 		if not p.ejected:
 			var killer := state.players[p.killed_by]
 			how = ("You were shot by %s, the Sheriff!" if killer.sheriff else "You were killed by %s!") % killer.name
 		_overlay_open("You're a ghost now", DIM_COLOR)
-		_overlay_box.add_child(_label(how + "\nGhosts can still do tasks to help the crew, but you can't talk about who did it. Shh!", 20, Color.WHITE, true))
+		_overlay_box.add_child(_label(how + "\nGhosts can still do chores to help the camp, but you can't talk about who did it. Shh!", 20, Color.WHITE, true))
 		_overlay_box.add_child(_button("OK", _begin_human_turn.bind(p)))
 		return
 	_overlay_close()
@@ -161,13 +161,13 @@ func _show_move_phase() -> void:
 	var moves := state.legal_moves(p)
 	board.show_view(state, p, moves)
 	var here := _who_is_here(p)
-	_prompt_label.text = "%s Where do you go? Click a green room, or stay to do a task here." % here
+	_prompt_label.text = "%s Where do you go? Click a green place, or stay to do a chore here." % here
 	_clear_buttons()
 	_buttons.add_child(_button("Stay in %s" % p.room, _on_move.bind(p.room)))
 	for room in moves:
 		if room != p.room:
 			var vent := not MapData.neighbors(p.room).has(room)
-			_buttons.add_child(_button(("Vent to %s" if vent else "Go to %s") % room, _on_move.bind(room)))
+			_buttons.add_child(_button(("Crawl through the hollow log to %s" if vent else "Go to %s") % room, _on_move.bind(room)))
 
 
 func _on_room_clicked(room: String) -> void:
@@ -235,8 +235,8 @@ func _start_meeting() -> void:
 		_overlay_box.add_child(_label("%s found %s's body in %s." % [
 			caller.name, state.players[meeting["reported"]].name, meeting["room"]], 22, Color.WHITE, true))
 	else:
-		_overlay_open("EMERGENCY MEETING", IMPOSTOR_COLOR, Color(0.12, 0.0, 0.02, 0.95))
-		_overlay_box.add_child(_label("%s pressed the emergency button." % caller.name, 22, Color.WHITE, true))
+		_overlay_open("CAMP MEETING", IMPOSTOR_COLOR, Color(0.12, 0.0, 0.02, 0.95))
+		_overlay_box.add_child(_label("%s rang the camp bell." % caller.name, 22, Color.WHITE, true))
 	var dead: Array[String] = []
 	for id in meeting["dead"]:
 		dead.append(state.players[id].name)
@@ -302,12 +302,12 @@ func _show_vote_result() -> void:
 	var ejected: int = result["ejected"]
 	if ejected >= 0:
 		var p := state.players[ejected]
-		_overlay_open("%s was ejected." % p.name, p.color.lightened(0.2))
+		_overlay_open("%s was voted out of camp." % p.name, p.color.lightened(0.2))
 		_overlay_box.add_child(_label(
 			"%s WAS the impostor!" % p.name if result["was_impostor"] else "%s was NOT the impostor." % p.name,
 			26, IMPOSTOR_COLOR if result["was_impostor"] else Color.WHITE, true))
 	else:
-		_overlay_open("No one was ejected.", Color.WHITE)
+		_overlay_open("No one was voted out.", Color.WHITE)
 	# Who voted for whom — another clue.
 	var lines: Array[String] = []
 	var tally: Dictionary = result["tally"]
@@ -322,7 +322,7 @@ func _show_vote_result() -> void:
 	if state.winner != "":
 		_overlay_box.add_child(_button("See who won", _show_game_over))
 	else:
-		_overlay_box.add_child(_button("Back to the ship", func() -> void:
+		_overlay_box.add_child(_button("Back to camp", func() -> void:
 			state.end_meeting()
 			_overlay_close()
 			_advance()))
@@ -342,7 +342,7 @@ func _show_game_over() -> void:
 	_hud_visible(false)
 	board.show_view(state, null, [], true)
 	var crew_won := state.winner == "crew"
-	_overlay_open("CREWMATES WIN!" if crew_won else "IMPOSTOR WINS!", CREW_COLOR if crew_won else IMPOSTOR_COLOR,
+	_overlay_open("LUMBERJACKS WIN!" if crew_won else "IMPOSTOR WINS!", CREW_COLOR if crew_won else IMPOSTOR_COLOR,
 			Color(0.02, 0.02, 0.07, 0.75))
 	_overlay_box.add_child(_label(state.win_reason, 22, Color.WHITE, true))
 	var imp := state.impostor()
@@ -353,7 +353,7 @@ func _show_game_over() -> void:
 	_overlay_box.add_child(_label(sheriff_result % (sheriff.name + (" (a bot)" if not sheriff.human else "")), 22,
 			SHERIFF_COLOR if state.sheriff_got_impostor else DIM_COLOR, true))
 	var progress := state.task_progress()
-	_overlay_box.add_child(_label("Tasks done: %d / %d   Rounds: %d" % [progress.x, progress.y, state.round_num], 18, DIM_COLOR, true))
+	_overlay_box.add_child(_label("Chores done: %d / %d   Rounds: %d" % [progress.x, progress.y, state.round_num], 18, DIM_COLOR, true))
 	_overlay_box.add_child(_button("Play again", _show_setup))
 
 
@@ -367,7 +367,7 @@ func _refresh_hud() -> void:
 	_task_count.text = "%d / %d " % [progress.x, progress.y]
 	_top_label.text = "Round %d  —  %s's turn" % [state.round_num, p.name]
 	_top_label.add_theme_color_override("font_color", p.color.lightened(0.3))
-	var role := "CREWMATE"
+	var role := "LUMBERJACK"
 	var role_color := CREW_COLOR
 	if p.impostor:
 		role = "IMPOSTOR"
@@ -385,7 +385,7 @@ func _refresh_hud() -> void:
 			role += " — " + ("ready to shoot!" if p.kill_cooldown == 0 else "reloading")
 	_role_label.text = role
 	_role_label.add_theme_color_override("font_color", role_color)
-	var lines: Array[String] = ["Fake tasks (blend in!):" if p.impostor else "Your tasks:"]
+	var lines: Array[String] = ["Fake chores (blend in!):" if p.impostor else "Your chores:"]
 	for task in p.tasks:
 		lines.append("%s %s — %s" % ["[x]" if task["done"] else "[  ]", task["room"], MapData.ROOM_TASKS[task["room"]]])
 	_tasks_label.text = "\n".join(lines)
@@ -397,6 +397,10 @@ func _build_hud() -> void:
 	add_child(layer)
 	var theme := Theme.new()
 	theme.default_font_size = 20
+	var panel_style := StyleBoxFlat.new()  # Solid dark-wood panels so text reads over the forest.
+	panel_style.bg_color = Color(0.13, 0.09, 0.06, 0.94)
+	panel_style.set_content_margin_all(8)
+	theme.set_stylebox("panel", "PanelContainer", panel_style)
 
 	var root := VBoxContainer.new()
 	root.theme = theme
@@ -414,7 +418,7 @@ func _build_hud() -> void:
 	_top_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_top_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_row.add_child(_top_label)
-	var tasks_title := _label("Crew tasks", 18, DIM_COLOR)
+	var tasks_title := _label("Camp chores", 18, DIM_COLOR)
 	tasks_title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	tasks_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top_row.add_child(tasks_title)

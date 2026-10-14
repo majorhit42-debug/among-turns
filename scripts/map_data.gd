@@ -1,45 +1,46 @@
 class_name MapData
 extends RefCounted
-## The ship: which rooms exist, where they sit on the board, and which halls
+## The lumber camp: which places exist, where they sit on the board, and which halls
 ## connect them. Change the map here — the board and the bots read it all.
 
 const ROOM_SIZE := 9.5
-const START_ROOM := "Cafeteria"
-const EMERGENCY_ROOM := "Cafeteria"
+const START_ROOM := "Mess Hall"
+const EMERGENCY_ROOM := "Mess Hall"
 
 ## Room name -> board position (x, z). The board is centered on the origin.
 const ROOMS := {
-	"Cafeteria": Vector2(0, -12),
-	"Weapons": Vector2(14, -12),
-	"Navigation": Vector2(24, 0),
-	"Shields": Vector2(14, 12),
-	"Storage": Vector2(0, 12),
-	"Electrical": Vector2(-14, 12),
-	"Engine": Vector2(-24, 0),
-	"Medbay": Vector2(-14, -12),
+	"Mess Hall": Vector2(0, -12),
+	"Tool Shed": Vector2(14, -12),
+	"Lookout Tower": Vector2(24, 0),
+	"Sawmill": Vector2(14, 12),
+	"Log Yard": Vector2(0, 12),
+	"Generator": Vector2(-14, 12),
+	"Bunkhouse": Vector2(-24, 0),
+	"Ranger Station": Vector2(-14, -12),
 }
 
-## The task you do in each room.
+## The chore you do in each place.
 const ROOM_TASKS := {
-	"Cafeteria": "Empty the garbage",
-	"Weapons": "Clear asteroids",
-	"Navigation": "Chart the course",
-	"Shields": "Prime the shields",
-	"Storage": "Fuel the cans",
-	"Electrical": "Fix the wiring",
-	"Engine": "Align the engine",
-	"Medbay": "Submit a scan",
+	"Mess Hall": "Wash the dishes",
+	"Tool Shed": "Sharpen the axes",
+	"Lookout Tower": "Watch for fires",
+	"Sawmill": "Saw the planks",
+	"Log Yard": "Stack the logs",
+	"Generator": "Refuel the generator",
+	"Bunkhouse": "Make the bunks",
+	"Ranger Station": "Fix the radio",
 }
 
-## Halls between rooms. A ring around the ship plus one shortcut down the middle.
+## Dirt paths between places. A ring around the camp plus one shortcut down the middle.
 const HALLS := [
-	["Cafeteria", "Weapons"], ["Weapons", "Navigation"], ["Navigation", "Shields"],
-	["Shields", "Storage"], ["Storage", "Electrical"], ["Electrical", "Engine"],
-	["Engine", "Medbay"], ["Medbay", "Cafeteria"], ["Cafeteria", "Storage"],
+	["Mess Hall", "Tool Shed"], ["Tool Shed", "Lookout Tower"], ["Lookout Tower", "Sawmill"],
+	["Sawmill", "Log Yard"], ["Log Yard", "Generator"], ["Generator", "Bunkhouse"],
+	["Bunkhouse", "Ranger Station"], ["Ranger Station", "Mess Hall"], ["Mess Hall", "Log Yard"],
 ]
 
-## Vents: secret tunnels only the impostor can use, as their move for the turn.
-const VENTS := [["Medbay", "Electrical"], ["Weapons", "Shields"], ["Engine", "Navigation"]]
+## Hollow logs: secret tunnels only the impostor can crawl through, as their move for the turn.
+## (In code they are still called "vents".)
+const VENTS := [["Ranger Station", "Generator"], ["Tool Shed", "Sawmill"], ["Bunkhouse", "Lookout Tower"]]
 
 
 static func room_names() -> Array[String]:

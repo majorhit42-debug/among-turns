@@ -1,15 +1,21 @@
 class_name Board
 extends Node3D
-## Draws the ship in 3D: rooms, halls, crewmates and bodies. It only shows what
-## the current viewer is allowed to see — the people and bodies in their own room.
+## Draws the lumber camp in 3D: places, dirt paths, pine trees, lumberjacks and
+## bodies. It only shows what the current viewer is allowed to see — the people
+## and bodies in their own place.
 
 signal room_clicked(room: String)
 
-const FLOOR_COLOR := Color(0.30, 0.34, 0.42)
-const HALL_COLOR := Color(0.20, 0.23, 0.29)
-const MOVE_COLOR := Color(0.28, 0.58, 0.40)  ## Rooms you can walk to this turn.
-const HERE_COLOR := Color(0.66, 0.58, 0.26)  ## The room you're standing in.
-const VISOR_COLOR := Color(0.62, 0.86, 0.96)
+const FLOOR_COLOR := Color(0.50, 0.34, 0.20)  ## Wooden plank floors.
+const HALL_COLOR := Color(0.47, 0.38, 0.26)  ## Dirt paths.
+const GRASS_COLOR := Color(0.20, 0.36, 0.16)
+const MOVE_COLOR := Color(0.55, 0.85, 0.40)  ## Places you can walk to this turn.
+const HERE_COLOR := Color(0.95, 0.72, 0.25)  ## The place you're standing in.
+const SKIN_COLOR := Color(0.93, 0.74, 0.58)
+const BEARD_COLOR := Color(0.36, 0.22, 0.12)
+const HANDLE_COLOR := Color(0.55, 0.38, 0.20)
+const BLADE_COLOR := Color(0.78, 0.80, 0.84)
+const TREE_COUNT := 140
 
 ## Spots inside a room where figures stand, front rows first.
 const SLOTS := [
@@ -28,6 +34,7 @@ var _figures: Array[Node3D] = []
 
 func _ready() -> void:
 	_build_environment()
+	_build_trees()
 	for hall in MapData.HALLS:
 		_build_hall(hall[0], hall[1])
 	for room in MapData.ROOMS:
@@ -62,13 +69,13 @@ func show_view(state: GameState, viewer: GameState.Player, moves: Array[String],
 func _place_room(state: GameState, room: String, viewer: GameState.Player) -> void:
 	var slot := 0
 	for p in state.players_in(room):
-		_add_figure(_make_crewmate(p, false, false), room, slot)
+		_add_figure(_make_lumberjack(p, false, false), room, slot)
 		slot += 1
 	if viewer and not viewer.alive and viewer.room == room:
-		_add_figure(_make_crewmate(viewer, false, true), room, slot)
+		_add_figure(_make_lumberjack(viewer, false, true), room, slot)
 		slot += 1
 	for body in state.bodies_in(room):
-		_add_figure(_make_crewmate(state.players[body["victim"]], true, false), room, slot)
+		_add_figure(_make_lumberjack(state.players[body["victim"]], true, false), room, slot)
 		slot += 1
 
 
@@ -92,26 +99,77 @@ func _has_open_task(p: GameState.Player, room: String) -> bool:
 func _build_environment() -> void:
 	var camera := Camera3D.new()
 	camera.fov = 46
-	camera.h_offset = -9.0  # Nudge the ship right, clear of the side panel.
+	camera.h_offset = -9.0  # Nudge the camp right, clear of the side panel.
 	camera.v_offset = -1.5
 	add_child(camera)
 	camera.position = Vector3(0, 54, 19.5)  # Steep, almost top-down view.
 	camera.look_at(Vector3.ZERO)
 
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-60, 25, 0)
+	sun.rotation_degrees = Vector3(-55, 30, 0)
+	sun.light_color = Color(1.0, 0.95, 0.85)
 	sun.shadow_enabled = true
 	add_child(sun)
 
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.02, 0.02, 0.07)
+	env.background_color = Color(0.53, 0.75, 0.90)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.65, 0.68, 0.80)
-	env.ambient_light_energy = 0.6
+	env.ambient_light_color = Color(0.75, 0.80, 0.70)
+	env.ambient_light_energy = 0.55
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
 	add_child(world_env)
+
+	var grass_mesh := PlaneMesh.new()
+	grass_mesh.size = Vector2(160, 110)
+	add_child(_mesh_part(grass_mesh, _material(GRASS_COLOR), Vector3(0, -0.25, 0)))
+
+
+## Pine trees scattered around the camp, never on a place or a path.
+## Same seed every time, so the forest doesn't change between games.
+func _build_trees() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2026
+	var trunk_material := _material(Color(0.40, 0.26, 0.14))
+	var needle_materials := [_material(Color(0.10, 0.30, 0.14)), _material(Color(0.14, 0.38, 0.16)), _material(Color(0.08, 0.25, 0.12))]
+	var placed := 0
+	while placed < TREE_COUNT:
+		var spot := Vector2(rng.randf_range(-44, 44), rng.randf_range(-30, 30))
+		if not _clear_of_camp(spot):
+			continue
+		placed += 1
+		var tree := Node3D.new()
+		var size := rng.randf_range(0.8, 1.4)
+		var trunk_mesh := CylinderMesh.new()
+		trunk_mesh.top_radius = 0.25
+		trunk_mesh.bottom_radius = 0.3
+		trunk_mesh.height = 1.0
+		tree.add_child(_mesh_part(trunk_mesh, trunk_material, Vector3(0, 0.5, 0)))
+		for layer in 3:
+			var cone := CylinderMesh.new()
+			cone.top_radius = 0.0
+			cone.bottom_radius = 1.5 - layer * 0.4
+			cone.height = 1.6
+			tree.add_child(_mesh_part(cone, needle_materials[rng.randi() % needle_materials.size()], Vector3(0, 1.5 + layer * 0.9, 0)))
+		tree.scale = Vector3.ONE * size
+		tree.position = Vector3(spot.x, -0.2, spot.y)
+		add_child(tree)
+
+
+func _clear_of_camp(spot: Vector2) -> bool:
+	var keep_out := MapData.ROOM_SIZE / 2.0 + 1.8
+	for room in MapData.ROOMS:
+		var center: Vector2 = MapData.ROOMS[room]
+		if absf(spot.x - center.x) < keep_out and absf(spot.y - center.y) < keep_out:
+			return false
+	for hall in MapData.HALLS:
+		var a: Vector2 = MapData.ROOMS[hall[0]]
+		var b: Vector2 = MapData.ROOMS[hall[1]]
+		var t := clampf((spot - a).dot(b - a) / (b - a).length_squared(), 0.0, 1.0)
+		if spot.distance_to(a + (b - a) * t) < 3.0:
+			return false
+	return true
 
 
 func _build_room(room: String) -> void:
@@ -127,31 +185,37 @@ func _build_room(room: String) -> void:
 	floor_node.position = Vector3(pos.x, 0, pos.y)
 	add_child(floor_node)
 
-	var label := _make_label(room, 56, Color.WHITE)
+	var label := _make_label(room, 46, Color.WHITE)
 	label.pixel_size = 0.025
 	label.position = Vector3(pos.x, 0.5, pos.y - 4.3)
 	add_child(label)
 
 	var mark := _make_label("!", 110, Color(1.0, 0.85, 0.1))
-	mark.position = Vector3(pos.x + 3.9, 1.0, pos.y - 3.6)
+	mark.position = Vector3(pos.x + 4.4, 1.0, pos.y - 3.0)
 	mark.visible = false
 	add_child(mark)
 	_task_marks[room] = mark
 
 	var vent := Node3D.new()
 	if not MapData.vent_exits(room).is_empty():
-		var grate_mesh := BoxMesh.new()
-		grate_mesh.size = Vector3(1.4, 0.1, 1.0)
-		var grate := MeshInstance3D.new()
-		grate.mesh = grate_mesh
-		var grate_material := StandardMaterial3D.new()
-		grate_material.albedo_color = Color(0.08, 0.08, 0.1)
-		grate.material_override = grate_material
-		vent.add_child(grate)
-		var vent_label := _make_label("vent", 36, Color(1, 0.4, 0.4))
+		var log_mesh := CylinderMesh.new()
+		log_mesh.top_radius = 0.5
+		log_mesh.bottom_radius = 0.5
+		log_mesh.height = 2.0
+		var hollow_log := _mesh_part(log_mesh, _material(Color(0.36, 0.24, 0.13)), Vector3(0, 0.3, 0))
+		hollow_log.rotation_degrees.z = 90
+		vent.add_child(hollow_log)
+		var hole_mesh := CylinderMesh.new()
+		hole_mesh.top_radius = 0.33
+		hole_mesh.bottom_radius = 0.33
+		hole_mesh.height = 0.05
+		var hole := _mesh_part(hole_mesh, _material(Color(0.05, 0.03, 0.02)), Vector3(1.0, 0.3, 0))
+		hole.rotation_degrees.z = 90
+		vent.add_child(hole)
+		var vent_label := _make_label("hollow log", 30, Color(1, 0.45, 0.4))
 		vent_label.position.y = 0.6
 		vent.add_child(vent_label)
-	vent.position = Vector3(pos.x - 3.7, 0.25, pos.y - 3.4)
+	vent.position = Vector3(pos.x - 3.4, 0.2, pos.y - 3.2)
 	vent.visible = false
 	add_child(vent)
 	_vent_marks[room] = vent
@@ -184,43 +248,72 @@ func _build_hall(a: String, b: String) -> void:
 	add_child(hall)
 
 
-func _make_crewmate(p: GameState.Player, dead: bool, ghost: bool) -> Node3D:
+func _make_lumberjack(p: GameState.Player, dead: bool, ghost: bool) -> Node3D:
 	var root := Node3D.new()
 	var pivot := Node3D.new()  # Lets a body lie down without moving its name tag.
 	root.add_child(pivot)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = p.color.darkened(0.35) if dead else p.color
+	var shirt := _material(p.color.darkened(0.35) if dead else p.color)
+	var skin := _material(SKIN_COLOR)
+	var beard := _material(BEARD_COLOR)
+	var handle := _material(HANDLE_COLOR)
+	var blade := _material(BLADE_COLOR)
 	if ghost:
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		material.albedo_color.a = 0.35
+		for m in [shirt, skin, beard, handle, blade]:
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.albedo_color.a = 0.35
 
-	var body_mesh := CapsuleMesh.new()
-	body_mesh.radius = 0.55
-	body_mesh.height = 1.6
-	pivot.add_child(_mesh_part(body_mesh, material, Vector3(0, 0.8, 0)))
+	var body_mesh := CapsuleMesh.new()  # Shirt in the player's color.
+	body_mesh.radius = 0.5
+	body_mesh.height = 1.4
+	pivot.add_child(_mesh_part(body_mesh, shirt, Vector3(0, 0.7, 0)))
 
-	var pack_mesh := BoxMesh.new()
-	pack_mesh.size = Vector3(0.7, 0.8, 0.35)
-	pivot.add_child(_mesh_part(pack_mesh, material, Vector3(0, 0.75, -0.55)))
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.36
+	head_mesh.height = 0.72
+	pivot.add_child(_mesh_part(head_mesh, skin, Vector3(0, 1.62, 0)))
 
-	var visor_mesh := CapsuleMesh.new()
-	visor_mesh.radius = 0.2
-	visor_mesh.height = 0.8
-	var visor_material := StandardMaterial3D.new()
-	visor_material.albedo_color = VISOR_COLOR
-	visor_material.roughness = 0.15
-	var visor := _mesh_part(visor_mesh, visor_material, Vector3(0, 1.1, 0.42))
-	visor.rotation_degrees.z = 90
-	pivot.add_child(visor)
+	var beard_mesh := BoxMesh.new()
+	beard_mesh.size = Vector3(0.5, 0.3, 0.2)
+	pivot.add_child(_mesh_part(beard_mesh, beard, Vector3(0, 1.45, 0.25)))
+
+	var hat_mesh := SphereMesh.new()  # Beanie, a shade darker than the shirt.
+	hat_mesh.radius = 0.38
+	hat_mesh.height = 0.5
+	hat_mesh.is_hemisphere = true
+	var hat_material := _material(p.color.darkened(0.25))
+	if ghost:
+		hat_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		hat_material.albedo_color.a = 0.35
+	pivot.add_child(_mesh_part(hat_mesh, hat_material, Vector3(0, 1.78, 0)))
+
+	# The axe, held at the right side, blade up.
+	var axe := Node3D.new()
+	var handle_mesh := CylinderMesh.new()
+	handle_mesh.top_radius = 0.06
+	handle_mesh.bottom_radius = 0.06
+	handle_mesh.height = 1.5
+	axe.add_child(_mesh_part(handle_mesh, handle, Vector3.ZERO))
+	var blade_mesh := BoxMesh.new()
+	blade_mesh.size = Vector3(0.5, 0.4, 0.08)
+	axe.add_child(_mesh_part(blade_mesh, blade, Vector3(0.25, 0.55, 0)))
+	axe.position = Vector3(0.7, 1.0, 0.2)
+	axe.rotation_degrees.z = -15
+	pivot.add_child(axe)
 
 	if dead:
 		pivot.rotation_degrees.x = -90
-		pivot.position = Vector3(0, 0.55, 0.6)
+		pivot.position = Vector3(0, 0.5, 0.6)
 	var tag := _make_label(p.name + (" (dead)" if dead else ""), 40, p.color.lightened(0.35))
 	tag.pixel_size = 0.02
-	tag.position.y = 1.4 if dead else 2.3
+	tag.position.y = 1.4 if dead else 2.5
 	root.add_child(tag)
 	return root
+
+
+func _material(color: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	return m
 
 
 func _mesh_part(mesh: Mesh, material: Material, pos: Vector3) -> MeshInstance3D:

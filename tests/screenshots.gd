@@ -43,6 +43,14 @@ func _init() -> void:
 	main.state.win_reason = "The impostor got everyone!"
 	main._show_game_over()
 	await _shot("8_game_over")
+	# Close-up of the characters at the game-over reveal.
+	main._overlay_close()
+	var cam := Camera3D.new()
+	main.board.add_child(cam)
+	cam.position = Vector3(-1, 7, -4)
+	cam.look_at(Vector3(0, 0.8, -11))
+	cam.make_current()
+	await _shot("10_closeup")
 	quit()
 
 
