@@ -13,6 +13,9 @@ func _init() -> void:
 	root.add_child(main)
 	await _shot("1_setup")
 	main.state.setup(2, 7)
+	for q in main.state.players:
+		q.sheriff = q.id == 0 and not q.impostor
+		q.bullets = GameState.SHERIFF_BULLETS if q.sheriff else 0
 	main._told_role.clear()
 	main._overlay_close()
 	main._advance()
@@ -30,6 +33,12 @@ func _init() -> void:
 	main._start_voting()
 	main._show_ballot(main.state.players[0])
 	await _shot("7_ballot")
+	main.state.sheriff_got_impostor = true
+	main.state.winner = "crew"
+	main.state.win_reason = "The Sheriff shot the impostor!"
+	main._show_game_over()
+	await _shot("9_sheriff_wins")
+	main.state.sheriff_got_impostor = false
 	main.state.winner = "impostor"
 	main.state.win_reason = "The impostor got everyone!"
 	main._show_game_over()

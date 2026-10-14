@@ -6,6 +6,7 @@ extends Node3D
 
 const CREW_COLOR := Color(0.45, 0.9, 1.0)
 const IMPOSTOR_COLOR := Color(1.0, 0.3, 0.3)
+const SHERIFF_COLOR := Color(1.0, 0.8, 0.25)
 const DIM_COLOR := Color(0.7, 0.75, 0.85)
 
 var state := GameState.new()
@@ -78,6 +79,7 @@ func _show_setup() -> void:
 		+ "• You only see who's in YOUR room. Remember what you saw!\n"
 		+ "• Crewmates: stay in a room for a turn to do a task there. Win by finishing all tasks or voting out the impostor.\n"
 		+ "• Impostor: catch someone alone and kill them. Use vents to sneak across the ship. Don't get caught!\n"
+		+ "• Sheriff: a crewmate with 2 bullets. Shoot the impostor to win, but nobody finds out who was shot until 3 players are dead!\n"
 		+ "• Find a body? Report it. Then everyone talks it over and votes in secret.", 18, Color.WHITE))
 	_overlay_box.add_child(_button("Start game", _start_game))
 
@@ -128,7 +130,10 @@ func _begin_human_turn(p: GameState.Player) -> void:
 		_told_role[p.id] = true
 		if p.impostor:
 			_overlay_open("You are the IMPOSTOR", IMPOSTOR_COLOR)
-			_overlay_box.add_child(_label("Kill crewmates when they're alone. You can travel through vents. Pretend to do tasks, and lie in meetings!", 20, Color.WHITE, true))
+			_overlay_box.add_child(_label("Kill crewmates when they're alone. You can travel through vents. Pretend to do tasks, and lie in meetings! Watch out: one crewmate is a secret Sheriff with a gun.", 20, Color.WHITE, true))
+		elif p.sheriff:
+			_overlay_open("You are the SHERIFF", SHERIFF_COLOR)
+			_overlay_box.add_child(_label("You're on the crew, with %d bullets for the whole game. You only win if YOU shoot the impostor. Shoot the wrong person and an innocent crewmate dies.\nYou won't find out if you got the impostor until %d players are dead. If you get killed, you lose." % [GameState.SHERIFF_BULLETS, GameState.SECRET_UNTIL_DEAD], 20, Color.WHITE, true))
 		else:
 			_overlay_open("You are a CREWMATE", CREW_COLOR)
 			_overlay_box.add_child(_label("Do your tasks (the yellow ! rooms) and watch who you see where. One of the others is the impostor...", 20, Color.WHITE, true))
@@ -136,8 +141,10 @@ func _begin_human_turn(p: GameState.Player) -> void:
 		return
 	if not p.alive and not _told_dead.has(p.id):
 		_told_dead[p.id] = true
-		var how := "You were voted off the ship." if p.ejected \
-				else "You were killed by %s!" % state.players[p.killed_by].name
+		var how := "You were voted off the ship."
+		if not p.ejected:
+			var killer := state.players[p.killed_by]
+			how = ("You were shot by %s, the Sheriff!" if killer.sheriff else "You were killed by %s!") % killer.name
 		_overlay_open("You're a ghost now", DIM_COLOR)
 		_overlay_box.add_child(_label(how + "\nGhosts can still do tasks to help the crew, but you can't talk about who did it. Shh!", 20, Color.WHITE, true))
 		_overlay_box.add_child(_button("OK", _begin_human_turn.bind(p)))
@@ -183,7 +190,11 @@ func _on_move(room: String) -> void:
 	_prompt_label.text = text + (" What do you do?" if not acts.is_empty() else " Nothing to do here.")
 	_clear_buttons()
 	for act in acts:
-		var color := IMPOSTOR_COLOR if act["type"] in ["kill", "report"] else Color.WHITE
+		var color := Color.WHITE
+		if act["type"] in ["kill", "report"]:
+			color = IMPOSTOR_COLOR
+		elif act["type"] == "shoot":
+			color = SHERIFF_COLOR
 		_buttons.add_child(_button(act["label"], _on_action.bind(act), color))
 	_buttons.add_child(_button("End turn", _end_human_turn))
 
@@ -336,6 +347,11 @@ func _show_game_over() -> void:
 	_overlay_box.add_child(_label(state.win_reason, 22, Color.WHITE, true))
 	var imp := state.impostor()
 	_overlay_box.add_child(_label("The impostor was %s%s." % [imp.name, " (a bot)" if not imp.human else ""], 22, imp.color.lightened(0.3), true))
+	var sheriff := state.sheriff()
+	var sheriff_result := "SHERIFF WINS! %s shot the impostor." if state.sheriff_got_impostor \
+			else "The Sheriff was %s. They lose: they didn't shoot the impostor."
+	_overlay_box.add_child(_label(sheriff_result % (sheriff.name + (" (a bot)" if not sheriff.human else "")), 22,
+			SHERIFF_COLOR if state.sheriff_got_impostor else DIM_COLOR, true))
 	var progress := state.task_progress()
 	_overlay_box.add_child(_label("Tasks done: %d / %d   Rounds: %d" % [progress.x, progress.y, state.round_num], 18, DIM_COLOR, true))
 	_overlay_box.add_child(_button("Play again", _show_setup))
@@ -351,13 +367,24 @@ func _refresh_hud() -> void:
 	_task_count.text = "%d / %d " % [progress.x, progress.y]
 	_top_label.text = "Round %d  —  %s's turn" % [state.round_num, p.name]
 	_top_label.add_theme_color_override("font_color", p.color.lightened(0.3))
-	var role := "IMPOSTOR" if p.impostor else "CREWMATE"
+	var role := "CREWMATE"
+	var role_color := CREW_COLOR
+	if p.impostor:
+		role = "IMPOSTOR"
+		role_color = IMPOSTOR_COLOR
+	elif p.sheriff:
+		role = "SHERIFF"
+		role_color = SHERIFF_COLOR
 	if not p.alive:
 		role += " (ghost)"
-	if p.impostor:
+	elif p.impostor:
 		role += "\nKill ready!" if p.kill_cooldown == 0 else "\nKill ready next round"
+	elif p.sheriff:
+		role += "\nBullets: %d" % p.bullets
+		if p.bullets > 0:
+			role += " — " + ("ready to shoot!" if p.kill_cooldown == 0 else "reloading")
 	_role_label.text = role
-	_role_label.add_theme_color_override("font_color", IMPOSTOR_COLOR if p.impostor else CREW_COLOR)
+	_role_label.add_theme_color_override("font_color", role_color)
 	var lines: Array[String] = ["Fake tasks (blend in!):" if p.impostor else "Your tasks:"]
 	for task in p.tasks:
 		lines.append("%s %s — %s" % ["[x]" if task["done"] else "[  ]", task["room"], MapData.ROOM_TASKS[task["room"]]])

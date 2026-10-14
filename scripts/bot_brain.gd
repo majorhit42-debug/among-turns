@@ -3,16 +3,34 @@ extends RefCounted
 ## How the computer players think.
 ## Crewmate bots walk to their tasks, report bodies, and remember who they saw.
 ## The impostor bot wanders, kills anyone it finds alone, and lies in meetings.
+## The Sheriff bot is a crew bot that shoots its top suspect when it finds them.
 
 const VOTE_THRESHOLD := 4.0  ## A crew bot votes for someone only if they're at least this suspicious.
 const CERTAIN := 100.0  ## Suspicion for "I saw them do it".
+const SHOOT_THRESHOLD := 2.0  ## The Sheriff bot shoots anyone at least this suspicious.
 
 
 static func take_turn(s: GameState, p: GameState.Player) -> void:
 	if p.impostor:
 		_impostor_turn(s, p)
+	elif _try_shoot(s, p):
+		return
 	else:
 		_crew_turn(s, p)
+
+
+## Sheriff only: shoot the top suspect if they're in the room and suspicious enough.
+static func _try_shoot(s: GameState, p: GameState.Player) -> bool:
+	if not s.can_shoot(p):
+		return false
+	var suspect := _top_suspect(s, p)
+	if suspect < 0 or p.suspicion[suspect] < SHOOT_THRESHOLD:
+		return false
+	var target := s.players[suspect]
+	if not target.alive or target.room != p.room:
+		return false
+	s.shoot(p, target)
+	return true
 
 
 static func _crew_turn(s: GameState, p: GameState.Player) -> void:
@@ -27,6 +45,11 @@ static func _crew_turn(s: GameState, p: GameState.Player) -> void:
 		_move_and_check(s, p, MapData.next_step(p.room, MapData.EMERGENCY_ROOM))
 		return
 	var target := _nearest_task_room(p)
+	# A Sheriff with a suspect goes hunting where it last saw them.
+	var hunt := _sheriff_hunt_room(s, p)
+	if hunt != "" and hunt != p.room:
+		_move_and_check(s, p, MapData.next_step(p.room, hunt))
+		return
 	if target == p.room:
 		s.do_task(p)
 	elif target != "":
@@ -35,8 +58,19 @@ static func _crew_turn(s: GameState, p: GameState.Player) -> void:
 		_move_and_check(s, p, _random_move(s, p.room))
 
 
+static func _sheriff_hunt_room(s: GameState, p: GameState.Player) -> String:
+	if not s.can_shoot(p):
+		return ""
+	var suspect := _top_suspect(s, p)
+	if suspect < 0 or p.suspicion[suspect] < SHOOT_THRESHOLD or not p.last_seen.has(suspect):
+		return ""
+	return p.last_seen[suspect]["room"]
+
+
 static func _move_and_check(s: GameState, p: GameState.Player, room: String) -> void:
 	s.move(p, room)
+	if _try_shoot(s, p):
+		return
 	if p.alive and not s.bodies_in(p.room).is_empty():
 		s.call_meeting(p, "report")
 	elif p.alive and p.room == MapData.EMERGENCY_ROOM and not p.used_emergency \
@@ -45,6 +79,8 @@ static func _move_and_check(s: GameState, p: GameState.Player, room: String) -> 
 
 
 static func _impostor_turn(s: GameState, p: GameState.Player) -> void:
+	if not p.alive:
+		return  # A shot impostor's ghost just haunts quietly.
 	var victim := _lone_victim(s, p)
 	if victim:
 		s.kill(p, victim)

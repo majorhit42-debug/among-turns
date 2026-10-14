@@ -5,13 +5,19 @@ extends RefCounted
 ##
 ## A round = every player takes one turn, in seat order. On a turn you move to a
 ## room next door (or stay), then do one thing: a task (only if you stayed put),
-## a kill (impostor), report a body, or call an emergency meeting.
+## a kill (impostor), a shot (Sheriff), report a body, or call an emergency meeting.
+##
+## The Sheriff is a crewmate with SHERIFF_BULLETS shots. They win only by shooting
+## the impostor. Whether the impostor has been shot stays secret until
+## SECRET_UNTIL_DEAD players are dead.
 
 const PLAYER_COUNT := 8
-const TASKS_PER_PLAYER := 6
+const TASKS_PER_PLAYER := 5
 const KILL_COOLDOWN := 1  ## Rounds the impostor must wait after a kill.
 const MEMORY_ROUNDS := 2  ## A sighting this many rounds before a murder counts as "near the body".
 const MAX_NOTES := 30
+const SHERIFF_BULLETS := 2
+const SECRET_UNTIL_DEAD := 3  ## A shot impostor isn't revealed until this many players are dead.
 
 const COLOR_NAMES := ["Red", "Blue", "Green", "Yellow", "Orange", "Purple", "Cyan", "Pink"]
 const COLORS := [
@@ -26,6 +32,8 @@ class Player:
 	var color := Color.WHITE
 	var human := false
 	var impostor := false
+	var sheriff := false
+	var bullets := 0
 	var alive := true
 	var ejected := false
 	var room := MapData.START_ROOM
@@ -55,6 +63,7 @@ var moved_this_turn := false
 var winner := ""  ## "", "crew" or "impostor"
 var win_reason := ""
 var pending_meeting := {}  ## Set when someone reports or calls a meeting.
+var sheriff_got_impostor := false
 var rng := RandomNumberGenerator.new()
 
 
@@ -72,7 +81,9 @@ func setup(num_humans: int, seed_value: int = -1) -> void:
 	winner = ""
 	win_reason = ""
 	pending_meeting = {}
+	sheriff_got_impostor = false
 	var impostor_seat := rng.randi_range(0, PLAYER_COUNT - 1)
+	var sheriff_seat := (impostor_seat + rng.randi_range(1, PLAYER_COUNT - 1)) % PLAYER_COUNT
 	for i in PLAYER_COUNT:
 		var p := Player.new()
 		p.id = i
@@ -80,7 +91,9 @@ func setup(num_humans: int, seed_value: int = -1) -> void:
 		p.color = COLORS[i]
 		p.human = i < num_humans
 		p.impostor = i == impostor_seat
-		p.kill_cooldown = 1  # No kills in round 1.
+		p.sheriff = i == sheriff_seat
+		p.bullets = SHERIFF_BULLETS if p.sheriff else 0
+		p.kill_cooldown = 1  # No kills (or shots) in round 1.
 		var rooms := _shuffled(MapData.room_names())
 		for t in TASKS_PER_PLAYER:
 			p.tasks.append({"room": rooms[t], "done": false})
@@ -106,7 +119,7 @@ func end_turn() -> void:
 		round_num += 1
 		turn_index = 0
 		for p in players:
-			if p.impostor and p.kill_cooldown > 0:
+			if p.kill_cooldown > 0:
 				p.kill_cooldown -= 1
 
 
@@ -182,6 +195,25 @@ func impostor() -> Player:
 	return null
 
 
+func sheriff() -> Player:
+	for p in players:
+		if p.sheriff:
+			return p
+	return null
+
+
+func dead_count() -> int:
+	var count := 0
+	for p in players:
+		if not p.alive:
+			count += 1
+	return count
+
+
+func can_shoot(p: Player) -> bool:
+	return p.sheriff and p.alive and p.bullets > 0 and p.kill_cooldown == 0
+
+
 ## x = crew tasks done, y = crew tasks total. Ghost crewmates' tasks still count.
 func task_progress() -> Vector2i:
 	var done := 0
@@ -210,6 +242,10 @@ func actions_for(p: Player) -> Array[Dictionary]:
 		for other in players_in(p.room):
 			if other != p:
 				acts.append({"type": "kill", "target": other.id, "label": "KILL " + other.name})
+	if can_shoot(p):
+		for other in players_in(p.room):
+			if other != p:
+				acts.append({"type": "shoot", "target": other.id, "label": "SHOOT " + other.name})
 	if p.room == MapData.EMERGENCY_ROOM and not p.used_emergency:
 		acts.append({"type": "emergency", "label": "Emergency meeting"})
 	return acts
@@ -221,6 +257,8 @@ func perform(p: Player, act: Dictionary) -> void:
 			do_task(p)
 		"kill":
 			kill(p, players[act["target"]])
+		"shoot":
+			shoot(p, players[act["target"]])
 		"report":
 			call_meeting(p, "report")
 		"emergency":
@@ -246,6 +284,24 @@ func kill(killer: Player, victim: Player) -> void:
 		if witness != killer:
 			witness.saw_kills.append({"killer": killer.id, "victim": victim.id, "room": killer.room, "round": round_num})
 			add_note(witness, "R%d %s: SAW %s KILL %s!!" % [round_num, killer.room, killer.name, victim.name])
+	check_win()
+
+
+## The Sheriff fires. Nobody is told whether it was the impostor.
+func shoot(shooter: Player, victim: Player) -> void:
+	shooter.bullets -= 1
+	shooter.kill_cooldown = KILL_COOLDOWN
+	victim.alive = false
+	victim.killed_by = shooter.id
+	bodies.append({"victim": victim.id, "killer": shooter.id, "room": shooter.room, "round": round_num})
+	newly_dead.append(victim.id)
+	if victim.impostor:
+		sheriff_got_impostor = true
+	add_note(shooter, "R%d %s: you shot %s" % [round_num, shooter.room, victim.name])
+	for witness in players_in(shooter.room):
+		if witness != shooter:
+			add_note(witness, "R%d %s: SAW %s SHOOT %s (%s is the Sheriff!)" % [
+				round_num, shooter.room, shooter.name, victim.name, shooter.name])
 	check_win()
 
 
@@ -310,7 +366,7 @@ func end_meeting() -> void:
 		if p.alive:
 			p.room = MapData.START_ROOM
 			add_note(p, "R%d: meeting over, back to %s" % [round_num, MapData.START_ROOM])
-		if p.impostor:
+		if p.impostor or p.sheriff:
 			p.kill_cooldown = maxi(p.kill_cooldown, 1)
 
 
@@ -326,13 +382,22 @@ func check_win() -> void:
 			else:
 				crew_alive += 1
 	var progress := task_progress()
+	var tasks_done := progress.x >= progress.y
 	if impostors_alive == 0:
-		winner = "crew"
-		win_reason = "The impostor was voted out!"
+		# A shot impostor stays secret until enough players are dead.
+		if impostor().ejected:
+			winner = "crew"
+			win_reason = "The impostor was voted out!"
+		elif dead_count() >= SECRET_UNTIL_DEAD:
+			winner = "crew"
+			win_reason = "The Sheriff shot the impostor!"
+		elif tasks_done:
+			winner = "crew"
+			win_reason = "All tasks are done!"
 	elif crew_alive <= impostors_alive:
 		winner = "impostor"
 		win_reason = "The impostor got everyone!"
-	elif progress.x >= progress.y:
+	elif tasks_done:
 		winner = "crew"
 		win_reason = "All tasks are done!"
 
